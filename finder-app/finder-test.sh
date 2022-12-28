@@ -50,7 +50,8 @@ then
 fi
 
 echo "Removing the old writer utility and compiling as a native application"
-cd "../assignments/assignment2"
+cp -p "../assignments/assignment2/Makefile" .
+cp -p "../assignments/assignment2/writer-main.c" . 
 make clean
 make
 
@@ -58,7 +59,6 @@ for i in $( seq 1 $NUMFILES)
 do
 	./writer "$WRITEDIR/${username}$i.txt" "$WRITESTR"
 done
-cd "../../finder-app"
 
 OUTPUTSTRING=$(./finder.sh "$WRITEDIR" "$WRITESTR")
 
