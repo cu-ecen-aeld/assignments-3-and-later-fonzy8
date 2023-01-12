@@ -1,4 +1,8 @@
 #include "systemcalls.h"
+#include "stdlib.h"
+#include "unistd.h"
+#include "sys/wait.h"
+#include "fcntl.h"
 
 /**
  * @param cmd the command to execute with system()
@@ -16,8 +20,21 @@ bool do_system(const char *cmd)
  *   and return a boolean true if the system() call completed with success
  *   or false() if it returned a failure
 */
+    int istatus;
+    bool iretval; 
 
-    return true;
+    istatus = system(cmd);
+
+    if ( WIFEXITED(istatus) ) {
+	// normal program termination
+	// This would give process exit status iretval = EXITSTATUS(istatus);
+	iretval = true;
+    } else {
+	// stopped by signal or abnormal stop
+	iretval = false;
+    }
+
+    return iretval;
 }
 
 /**
@@ -36,6 +53,8 @@ bool do_system(const char *cmd)
 
 bool do_exec(int count, ...)
 {
+    pid_t parent_pid = getpid(); // this is parents pid
+
     va_list args;
     va_start(args, count);
     char * command[count+1];
@@ -43,11 +62,9 @@ bool do_exec(int count, ...)
     for(i=0; i<count; i++)
     {
         command[i] = va_arg(args, char *);
+	printf("DBG : Command %d is %s\n", i, command[i]);
     }
     command[count] = NULL;
-    // this line is to avoid a compile warning before your implementation is complete
-    // and may be removed
-    command[count] = command[count];
 
 /*
  * TODO:
@@ -58,6 +75,31 @@ bool do_exec(int count, ...)
  *   as second argument to the execv() command.
  *
 */
+    pid_t child_pid = fork();
+    printf("DBG - Child process from parent %d created is %d\n",parent_pid, child_pid);
+
+    if (child_pid == -1) {
+	// failed to fork
+	printf("DBG - Error in forking\n");
+        return false;
+    } else if ( child_pid > 0 ) {
+	// we are the parent
+	int status;
+	waitpid (child_pid, &status, 0);
+	if (WIFEXITED(status)) {
+	    printf ("DBG - Child exit with status %d\n", WEXITSTATUS(status));
+	    return (WEXITSTATUS(status) == 0);
+	}
+	if (WIFSIGNALED(status)) {
+	    printf ("DBG - Child signal with status %d\n", WTERMSIG(status));
+	    return false;
+	}
+    } else {
+	// we are the child
+        execv(command[0], command);   // this should never return
+	printf("DBG - Unknown command %s in child process\n",command[0]);
+  	exit(5);    // I've decided error 5 is unknown command. Just needs to be non-zero !
+    }
 
     va_end(args);
 
@@ -71,6 +113,8 @@ bool do_exec(int count, ...)
 */
 bool do_exec_redirect(const char *outputfile, int count, ...)
 {
+    pid_t parent_pid = getpid(); // this is parents pid
+
     va_list args;
     va_start(args, count);
     char * command[count+1];
@@ -80,10 +124,6 @@ bool do_exec_redirect(const char *outputfile, int count, ...)
         command[i] = va_arg(args, char *);
     }
     command[count] = NULL;
-    // this line is to avoid a compile warning before your implementation is complete
-    // and may be removed
-    command[count] = command[count];
-
 
 /*
  * TODO
@@ -92,6 +132,38 @@ bool do_exec_redirect(const char *outputfile, int count, ...)
  *   The rest of the behaviour is same as do_exec()
  *
 */
+    int fd = open(outputfile, O_WRONLY|O_TRUNC|O_CREAT, 0644);
+    if (fd < 0) { printf("DBG - Redirect file not opened\n"); return false; }
+    
+    pid_t child_pid = fork();
+    printf("DBG - Child process from parent %d created is %d\n",parent_pid, child_pid);
+
+    if (child_pid == -1) {
+	// failed to fork
+	printf("DBG - Error in forking\n");
+        return false;
+    } else if ( child_pid > 0 ) {
+	// we are the parent
+	close(fd);
+	int status;
+	waitpid (child_pid, &status, 0);
+	if (WIFEXITED(status)) {
+	    printf ("DBG - Child exit with status %d\n", WEXITSTATUS(status));
+	    return (WEXITSTATUS(status) == 0);
+	}
+	if (WIFSIGNALED(status)) {
+	    printf ("DBG - Child signal with status %d\n", WTERMSIG(status));
+	    return false;
+	}
+    } else {
+	// we are the child
+	if (dup2(fd, 1) < 0) { printf("DBG - Dup2 failed\n"); return false; }
+	close(fd);
+	
+        execv(command[0], command);   // this should never return
+	printf("DBG - Unknown command %s in child process\n",command[0]);
+  	exit(5);    // I've decided error 5 is unknown command. Just needs to be non-zero !
+    }
 
     va_end(args);
 

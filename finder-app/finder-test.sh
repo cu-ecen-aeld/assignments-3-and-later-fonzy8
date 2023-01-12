@@ -50,10 +50,10 @@ then
 fi
 
 echo "Removing the old writer utility and compiling as a native application"
-cp -p "../assignments/assignment2/Makefile" .
-cp -p "../assignments/assignment2/writer-main.c" . 
-make clean
-make
+# cp -p "../assignments/assignment2/Makefile" .
+# cp -p "../assignments/assignment2/writer-main.c" . 
+# make clean
+# make
 
 for i in $( seq 1 $NUMFILES)
 do
